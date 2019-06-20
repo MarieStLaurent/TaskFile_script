@@ -73,7 +73,7 @@ var taskFile_headers_CIMAQ_memory = {
     },
     "position_correct":{
       "column_index": 13,
-      "data_type": "int",
+      "data_type": "integer",
       "description":"position (quadrant) of the image on the screen during in-scan encoding;
       ADD DESCRIPTION OF WHICH NUMBER = WHICH QUADRANT"
     },
@@ -83,7 +83,7 @@ var taskFile_headers_CIMAQ_memory = {
       "description":"position (quadrant) where the participant remembered the image to be
       shown in the scanner. During the post-scan memory test, position was probed if and only if
       the participant categorized an image as 'old' (previously seen in scanner), whether it was
-      previously seen or not (new)"
+      previously seen (old) or not (new)"
     },
     "position_accuracy":{
       "column_index": 15,
@@ -99,4 +99,4 @@ var taskFile_headers_CIMAQ_memory = {
       "description":"time (in seconds) taken by participants to provide the in-scan position (quadrant)
       of an image they perceived as old (previously shown in the scanner), from trial onset"
     }
-}
+};
