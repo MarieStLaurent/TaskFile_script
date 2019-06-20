@@ -1,16 +1,5 @@
 
-###Pending Qs for Samira: what purpose of first 3 trials? (signal equilibrium?)
-### What is the control task (what looks like?)
-###How are pictures labelled? Is the same image always old, or is
-###the oldness or newness of the image randomized between participants?
-###Can I have a directory with the stimulus images in it?
-##How are images labelled? (old - new, number always matches same pic?)
-##How to interpret response and response time to source question if post-scan pic identified as new?
-##(do they just press whatever?)
 
-#####################################
-
-#Analysis steps:
 import os
 import sys
 import argparse
@@ -59,63 +48,60 @@ def get_all_ids(iDir):
     if not os.path.exists(iDir):
         sys.exit('This folder doesnt exist: {}'.format(iDir))
         return
-
     ids = []
     allZipFiles = glob.glob(os.path.join(iDir,'*.zip'))
     for currZipFile in allZipFiles:
         currZipFile = os.path.basename(currZipFile)
-
         ids.append((currZipFile.split('_')[0],currZipFile.split('_')[1]))
-
     return ids
 
 def set_subject_data(idBeh, datadir, output):
+    print(idBeh) #qui est-ce qui plante le code?
     sub_files = []
-    s_dir = glob.glob(datadir+'/'+idBeh+'*.zip')
+    s_dir = glob.glob(os.path.join(datadir, idBeh+'*.zip'))
     if len(s_dir) != 1:
         print('Multiple directories match subject id '+idBeh)
     else:
-        z_ref = zipfile.ZipFile(s_dir[0], 'r')
-        z_ref.extractall(output)
-        z_ref.close()
-        s_main = glob.glob(output+'/'+idBeh+'*/Output-Responses-Encoding_CIMAQ_*')
-        s_onsets = glob.glob(output+'/'+idBeh+'*/Onset-Event-Encoding_CIMAQ_*')
-        s_postscan = glob.glob(output+'/'+idBeh+'*/Output_Retrieval_CIMAQ_*')
-        if(len(s_main)==len(s_onsets)==len(s_postscan)==1):
-            sub_files.append(s_main[0])
-            sub_files.append(s_onsets[0])
-            sub_files.append(s_postscan[0])
+        s_path = os.path.join(output, idBeh+'*')
+        s_out = glob.glob(s_path)
+        if len(s_out)<1:
+            z_ref = zipfile.ZipFile(s_dir[0], 'r')
+            z_ref.extractall(output)
+            z_ref.close()
+            s_out = glob.glob(s_path)
+        prefix = ['Output-Responses-Encoding_CIMAQ_*', 'Onset-Event-Encoding_CIMAQ_*',
+        'Output_Retrieval_CIMAQ_*']
+        if len(s_out)==1:
+            for i in range (0, 3):
+                file = glob.glob(os.path.join(s_out[0], prefix[i]))
+                if len(file)==1:
+                    sub_files.append(file[0])
     return sub_files
 
 def cleanMain(mainFile):
     #remove first three junk rows (blank trials): CTL0, Enc00 and ENc000
     mainFile.drop([0, 1, 2], axis=0, inplace=True)
     #re-label columns
-    mainFile.rename(columns={'Category':'Condition', 'OldNumber':'StimulusID',
-    'Stim_RESP':'InScan_Resp', 'Stim_RT':'InScan_RT'}, inplace=True)
+    mainFile.rename(columns={'TrialNumber':'trial_number', 'Category':'trial_type',
+    'OldNumber':'stim_id', 'CorrectSource':'position_correct', 'Stim_RESP':'response',
+    'Stim_RT':'response_time'}, inplace=True)
+    #remove redundant columns
+    mainFile.drop(['TrialCode', 'Stim_ACC'], axis=1, inplace=True)
+    #re-order columns
+    cols = ['trial_number', 'trial_type', 'response', 'response_time',
+    'stim_id', 'position_correct']
+    mainFile = mainFile[cols]
     #change in-scan reaction time from ms to s
-    mainFile[['InScan_RT']]=mainFile[['InScan_RT']].astype('float64', copy=False)
-    mainFile['InScan_RT'] = mainFile['InScan_RT'].div(1000)
-    #remove redundant column (same info as column InScan_Resp)
-    mainFile.drop('Stim_ACC', axis=1, inplace=True)
-
-    ##TO FIX: make this section more efficient!
-    ##Add new columns; Change column order?
-    #For onsetTime and offsetTime columns, could instead copy entire columns from onset subfiles...
-    mainFile.insert(loc=mainFile.shape[1], column='onsetTime', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=len(mainFile.columns), column='offsetTime', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=len(mainFile.columns), column='Duration', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='StimCategory', value='None', allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='StimulusImage', value='None', allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='PostScanReco_ACC', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='PostScanReco_RT', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='PostScan_SourceResp', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='PostScan_SourceRT', value=NaN, allow_duplicates=True)
-    mainFile.insert(loc=mainFile.shape[1], column='PostScan_SourceACC', value=NaN, allow_duplicates=True)
-    #cast float numerical columns as float64 type (pandas' float)
-    #Overkill? (NaN type infered as float64 by pandas);
-    mainFile[['onsetTime', 'offsetTime', 'Duration']]=mainFile[['onsetTime', 'offsetTime', 'Duration']].astype('float64', copy=False)
-    mainFile[['PostScanReco_RT', 'PostScan_SourceRT']]=mainFile[['PostScanReco_RT', 'PostScan_SourceRT']].astype('float64', copy=False)
+    mainFile['response_time']=mainFile['response_time'].astype('float64', copy=False)
+    mainFile['response_time'] = mainFile['response_time'].div(1000)
+    #insert new columns
+    colNames = ['onset', 'duration', 'offset', 'stim_file', 'stim_category', 'stim_name',
+    'recognition_accuracy', 'recognition_responsetime', 'position_response', 'position_accuracy',
+    'position_responsetime']
+    dtype = [NaN, NaN, NaN, 'None', 'None', 'None', -1, NaN, -1, -1, NaN]
+    colIndex = [1, 2, 3, 8, 9, 10, 11, 12, 14, 15, 16]
+    for i in range (0, 11):
+        mainFile.insert(loc=colIndex[i], column=colNames[i], value=dtype[i], allow_duplicates=True)
     return mainFile #modified in-place
 
 def cleanOnsets(onsets):
@@ -128,100 +114,112 @@ def cleanOnsets(onsets):
 
 def cleanRetriev(ret):
     #Change column headers
-    ret.rename(columns={'category':'OLD_NEW', 'Stim':'Stimulus',
-    'OldNumber':'StimulusID', 'Recognition_Resp':'Recognition_Resp_1old_2new',
-    'Spatial_RESP':'SpatialSource_Resp', 'Spatial_RT':'SpatialSource_RT',
-    'Spatial_ACC(à corriger voir output-encodage)':'SpatialSource_ACC'}, inplace=True)
+    ret.rename(columns={'category':'old_new', 'Stim':'stim_file',
+    'OldNumber':'stim_id', 'Recognition_ACC':'recognition_accuracy',
+    'Recognition_RESP':'recognition_response', 'Recognition_RT':'recognition_responsetime',
+    'Spatial_RESP':'position_response', 'Spatial_RT':'position_responsetime',
+    'Spatial_ACC(à corriger voir output-encodage)':'position_accuracy'}, inplace=True)
+    #re-order columns
+    cols = ['old_new', 'stim_file', 'stim_id', 'recognition_response',
+    'recognition_accuracy', 'recognition_responsetime', 'position_response',
+    'position_accuracy', 'position_responsetime']
+    ret = ret[cols]
     #Transform reaction time columns from ms to s
-    ret[['Recognition_RT']]=ret[['Recognition_RT']].astype('float64', copy=False) #string is object in pandas, str in Python
-    ret[['SpatialSource_RT']]=ret[['SpatialSource_RT']].astype('float64', copy=False)
-    ret['Recognition_RT'] = ret['Recognition_RT'].div(1000)
-    ret['SpatialSource_RT'] = ret['SpatialSource_RT'].div(1000)
-    #FIX efficienty: add new columns; change order?
-    ret.insert(loc=ret.shape[1], column='TrialNum', value=NaN, allow_duplicates=True) #type = int64 -> int
-    ret.insert(loc=ret.shape[1], column='SpatialCorrectSource', value=NaN, allow_duplicates=True) #type = int64 -> int
-    ret.insert(loc=ret.shape[1], column='StimCategory', value='None', allow_duplicates=True) #type = object -> string
-    ret.insert(loc=ret.shape[1], column='StimulusImage', value='None', allow_duplicates=True) #type = object -> string
-    ret.insert(loc=ret.shape[1], column='TrialPerfoType', value='None', allow_duplicates=True) #type = int64 -> int
-    #Extract info and fill TrialNum, StimCategory and StimulusImage columns
-    for i in ret.index:
-        ret.loc[i, 'TrialNum'] = i+1
-        #format: category_imageName.bmp w some space, _ and - in image names
-        stimInfo = ret.loc[i, 'Stimulus']
-        categ = re.findall('(.+?)_', stimInfo)[0]
-        ima = re.findall('_(.+?)[.]', stimInfo)[0]
-        ret.loc[i, 'StimCategory'] = categ
-        ret.loc[i, 'StimulusImage'] = ima
-    #Fix efficiency: Fill TrialPerfoType column based on old/new and trial type
-    for i in ret.index:
-        if ret.loc[i, 'OLD_NEW'] == 'OLD':
-            if ret.loc[i, 'Recognition_ACC'] == 1:
-                ret.loc[i, 'TrialPerfoType']='Hit'
-            else:
-                ret.loc[i, 'TrialPerfoType']='Miss'
-        else:
-            if ret.loc[i, 'Recognition_ACC'] == 1:
-                ret.loc[i, 'TrialPerfoType']='CR'
-            else:
-                ret.loc[i, 'TrialPerfoType']='FA'
+    ret[['recognition_responsetime']]=ret[['recognition_responsetime']].astype('float64', copy=False) #string is object in pandas, str in Python
+    ret[['position_responsetime']]=ret[['position_responsetime']].astype('float64', copy=False)
+    ret['recognition_responsetime'] = ret['recognition_responsetime'].div(1000)
+    ret['position_responsetime'] = ret['position_responsetime'].div(1000)
+    #Clean up eprime mistake: replace position_responsetime to NaN if old_new == new
+    #PROBLEM: cannot flag trials were person answered OLD but failed to give position answer when probed
+    #There should not be an RT value there, it was carried over from previous trial as a filler
+    i = ret[ret['recognition_response']==2].index
+    ret.loc[i, 'position_responsetime']= NaN
+    ret.loc[i, 'position_response'] = -1
+    #insert new columns
+    colNames = ['trial_number', 'stim_category', 'stim_name',
+    'recognition_performance', 'position_correct']
+    dtype = [-1, 'None', 'None', 'None', -1]
+    colIndex = [0, 4, 5, 9, 10]
+    for j in range (0, 5):
+        ret.insert(loc=colIndex[j], column=colNames[j], value=dtype[j], allow_duplicates=True)#FIX efficienty: add new columns; change order?
+    #Extract info and fill trial_number, stim_category and stim_name columns
+    k = ret.index
+    ret.loc[k, 'trial_number'] = k+1
+    #format: category_imageName.bmp w some space, _ and - in image names
+    stimInfo = ret.loc[k, 'stim_file']
+    for s in k:
+        ret.loc[s, 'stim_category'] = re.findall('(.+?)_', stimInfo[s])[0]
+        ret.loc[s, 'stim_name'] = re.findall('_(.+?)[.]', stimInfo[s])[0]
+    #Fix efficiency: Fill recognition_performance column based on actual and perceived novelty
+    m = ret[ret['old_new']=='OLD'].index.intersection(ret[ret['recognition_accuracy']==1].index)
+    ret.loc[m, 'recognition_performance']='Hit'
+    n = ret[ret['old_new']=='OLD'].index.intersection(ret[ret['recognition_accuracy']==0].index)
+    ret.loc[n, 'recognition_performance']='Miss'
+    o = ret[ret['old_new']=='New'].index.intersection(ret[ret['recognition_accuracy']==1].index)
+    ret.loc[o, 'recognition_performance']='CR'
+    p = ret[ret['old_new']=='New'].index.intersection(ret[ret['recognition_accuracy']==0].index)
+    ret.loc[p, 'recognition_performance']='FA'
+    #return cleaned up input Dataframe
     return ret
 
 def addOnsets(main, enc):
     #make main file indexable by trial number:
-    main.set_index('TrialNumber', inplace = True)
+    main.set_index('trial_number', inplace = True)
     #copy trial onset and offset times from enc into main
     #note: fixation's onset time is the trial task's offset time
     for i in enc.index:
         trialNum = enc.loc[i, 'TrialNum']
-        if(enc.loc[i, 'Trial_part']=='Fixation'):
-            main.loc[trialNum, 'offsetTime'] = enc.loc[i, 'onsetSec']
-        else:
-            main.loc[trialNum, 'onsetTime'] = enc.loc[i, 'onsetSec']
+        if enc.loc[i, 'Trial_part']=='Fixation':
+            main.loc[trialNum, 'offset'] = enc.loc[i, 'onsetSec']
+        else :
+            main.loc[trialNum, 'onset'] = enc.loc[i, 'onsetSec']
     #Calculate trial duration time from onset and offset times
-    main['Duration'] = main['offsetTime']-main['onsetTime']
+    main['duration'] = main['offset']-main['onset']
     #reset main's searchable index to default
     main.reset_index(level=None, drop=False, inplace=True)
     return main
 
 def addPostScan(main, ret):
     #split main's rows (trials) into sublist based on Condition
-    mainEnc = main[main['Condition']=='Enc']
-    mainCTL = main[main['Condition']=='CTL']
+    mainEnc = main[main['trial_type']=='Enc'].copy()
+    mainCTL = main[main['trial_type']=='CTL'].copy()
     #make mainEnc indexable by picture id
-    mainEnc.set_index('StimulusID', inplace = True)
+    mainEnc.set_index('stim_id', inplace = True)
     #import post-scan data from ret into mainEnc
-    for i in ret.index:
-        if(ret.loc[i, 'OLD_NEW']=='OLD'):
-            stimID = ret.loc[i, 'StimulusID']
-            mainEnc.loc[stimID, 'StimCategory'] = ret.loc[i, 'StimCategory']
-            mainEnc.loc[stimID, 'StimulusImage'] = ret.loc[i, 'StimulusImage']
-            mainEnc.loc[stimID, 'PostScanReco_ACC'] = ret.loc[i, 'Recognition_ACC']
-            mainEnc.loc[stimID, 'PostScanReco_RT'] = ret.loc[i, 'Recognition_RT']
-            mainEnc.loc[stimID, 'PostScan_SourceResp'] = ret.loc[i, 'SpatialSource_Resp']
-            mainEnc.loc[stimID, 'PostScan_SourceRT'] = ret.loc[i, 'SpatialSource_RT']
-    #calculate post-scan source accuracy
-    for i in mainEnc.index:
-        if mainEnc.loc[i, 'CorrectSource'] == mainEnc.loc[i, 'PostScan_SourceResp']:
-            mainEnc.loc[i, 'PostScan_SourceACC'] = 1
+    for i in ret[ret['old_new']=='OLD'].index:
+        stimID = ret.loc[i, 'stim_id']
+        mainEnc.loc[stimID, 'stim_category'] = ret.loc[i, 'stim_category']
+        mainEnc.loc[stimID, 'stim_name'] = ret.loc[i, 'stim_name']
+        mainEnc.loc[stimID, 'recognition_accuracy'] = ret.loc[i, 'recognition_accuracy']
+        mainEnc.loc[stimID, 'recognition_responsetime'] = ret.loc[i, 'recognition_responsetime']
+        mainEnc.loc[stimID, 'position_response'] = ret.loc[i, 'position_response']
+        mainEnc.loc[stimID, 'position_responsetime'] = ret.loc[i, 'position_responsetime']
+    #calculate post-scan source (position) accuracy;
+    # -1 = control task; 0 = missed trial; 1 = wrong source (image recognized but wrong quadrant remembered);
+    #2 = image recognized with correct source
+    mainEnc['position_accuracy'] = 0
+    for j in mainEnc[mainEnc['recognition_accuracy']==1].index:
+        if mainEnc.loc[j, 'position_correct'] == mainEnc.loc[j, 'position_response']:
+            mainEnc.loc[j, 'position_accuracy'] = 2
         else:
-            mainEnc.loc[i, 'PostScan_SourceACC'] = 0
+            mainEnc.loc[j, 'position_accuracy'] = 1
     #import source accuracy info from mainEnc into ret (in-place); global variable?
-    for i in ret.index:
-        if(ret.loc[i, 'OLD_NEW']=='OLD'):
-            picID = ret.loc[i, 'StimulusID']
-            ret.loc[i, 'SpatialCorrectSource'] = mainEnc.loc[picID, 'CorrectSource']
-            ret.loc[i, 'SpatialSource_ACC'] = mainEnc.loc[picID, 'PostScan_SourceACC']
+    #relies on index i and stimID lists defined on L187-188
+    for i in ret[ret['old_new']=='OLD'].index:
+        picID = ret.loc[i, 'stim_id']
+        ret.loc[i, 'position_correct'] = mainEnc.loc[picID, 'position_correct']
+        ret.loc[i, 'position_accuracy'] = mainEnc.loc[picID, 'position_accuracy']
     #reset mainEnc searchable index to default
     #and re-order columns to match order in mainCTL
     mainEnc.reset_index(level=None, drop=False, inplace=True)
-    cols = ['TrialNumber', 'Condition', 'TrialCode', 'StimulusID',
-     'CorrectSource', 'InScan_Resp', 'InScan_RT', 'onsetTime', 'offsetTime', 'Duration',
-     'StimCategory', 'StimulusImage', 'PostScanReco_ACC', 'PostScanReco_RT',
-     'PostScan_SourceResp', 'PostScan_SourceRT', 'PostScan_SourceACC']
+    cols = ['trial_number', 'onset', 'duration', 'offset', 'trial_type', 'response',
+       'response_time', 'stim_id', 'stim_file', 'stim_category',
+       'stim_name', 'recognition_accuracy', 'recognition_responsetime',
+       'position_correct', 'position_response', 'position_accuracy', 'position_responsetime']
     mainEnc = mainEnc[cols]
     #Re-merge mainEnc and mainCTL and re-order by trial number
     mainMerged = mainEnc.append(mainCTL, ignore_index=True)
-    mainMerged.sort_values('TrialNumber', axis=0, ascending=True, inplace=True)
+    mainMerged.sort_values('trial_number', axis=0, ascending=True, inplace=True)
     return mainMerged
 
 def extract_taskFile(bID, sID, file_list, output):
@@ -245,21 +243,20 @@ def extract_taskFile(bID, sID, file_list, output):
     sep='\t', header=True, index=False)
 
 def main():
-    """Let's go"""
     args =  get_arguments()
     all_ids = get_all_ids(args.idir[0])
     temp_dir = args.odir[0]+'/Temp'
     file_dir = args.odir[0]+'/TaskFiles'
-    os.mkdir(temp_dir) #where unzip subject file, remove when done
-    os.mkdir(file_dir) #where task files are saved
+    if not os.path.exists(temp_dir):
+        os.mkdir(temp_dir) #where unzip subject file, remove when done
+    if not os.path.exists(file_dir):
+        os.mkdir(file_dir) #where task files are saved
     for (idBehav, idMRI) in all_ids:
         s_files = set_subject_data(idBehav, args.idir[0], temp_dir)
         if(len(s_files)==3):
             extract_taskFile(idBehav, idMRI, s_files, file_dir)
         else:
             print('missing files for subject '+idBehav)
-
-        print(idBehav,idMRI)
     os.rmdir(temp_dir)
 
 if __name__ == '__main__':
