@@ -56,7 +56,7 @@ def get_all_ids(iDir):
     return ids
 
 def set_subject_data(idBeh, datadir, output):
-    print(idBeh) #qui est-ce qui plante le code?
+    print(idBeh)
     sub_files = []
     s_dir = glob.glob(os.path.join(datadir, idBeh+'*.zip'))
     if len(s_dir) != 1:
@@ -99,7 +99,7 @@ def cleanMain(mainFile):
     'recognition_accuracy', 'recognition_responsetime', 'position_response', 'position_accuracy',
     'position_responsetime']
     dtype = [NaN, NaN, NaN, 'None', 'None', 'None', -1, NaN, -1, -1, NaN]
-    colIndex = [1, 2, 3, 8, 9, 10, 11, 12, 14, 15, 16]
+    colIndex = [0, 1, 2, 8, 9, 10, 11, 12, 14, 15, 16]
     for i in range (0, 11):
         mainFile.insert(loc=colIndex[i], column=colNames[i], value=dtype[i], allow_duplicates=True)
     return mainFile #modified in-place
@@ -129,9 +129,10 @@ def cleanRetriev(ret):
     ret[['position_responsetime']]=ret[['position_responsetime']].astype('float64', copy=False)
     ret['recognition_responsetime'] = ret['recognition_responsetime'].div(1000)
     ret['position_responsetime'] = ret['position_responsetime'].div(1000)
-    #Clean up eprime mistake: replace position_responsetime to NaN if old_new == new
-    #PROBLEM: cannot flag trials were person answered OLD but failed to give position answer when probed
-    #There should not be an RT value there, it was carried over from previous trial as a filler
+    #Clean up eprime mistake: replace position_response and position_responsetime
+    #to NaN if subject perceived image as new (not probed for position)
+    #There should not be a response or an RT value there, it is carried over from previous trial (not reset)
+    #VERIFY: cannot flag trials were person answered OLD but failed to give position answer when probed
     i = ret[ret['recognition_response']==2].index
     ret.loc[i, 'position_responsetime']= NaN
     ret.loc[i, 'position_response'] = -1
@@ -150,7 +151,7 @@ def cleanRetriev(ret):
     for s in k:
         ret.loc[s, 'stim_category'] = re.findall('(.+?)_', stimInfo[s])[0]
         ret.loc[s, 'stim_name'] = re.findall('_(.+?)[.]', stimInfo[s])[0]
-    #Fix efficiency: Fill recognition_performance column based on actual and perceived novelty
+    #Fill recognition_performance column based on actual and perceived novelty
     m = ret[ret['old_new']=='OLD'].index.intersection(ret[ret['recognition_accuracy']==1].index)
     ret.loc[m, 'recognition_performance']='Hit'
     n = ret[ret['old_new']=='OLD'].index.intersection(ret[ret['recognition_accuracy']==0].index)
@@ -203,8 +204,7 @@ def addPostScan(main, ret):
             mainEnc.loc[j, 'position_accuracy'] = 2
         else:
             mainEnc.loc[j, 'position_accuracy'] = 1
-    #import source accuracy info from mainEnc into ret (in-place); global variable?
-    #relies on index i and stimID lists defined on L187-188
+    #import source accuracy info from mainEnc into ret (in-place)
     for i in ret[ret['old_new']=='OLD'].index:
         picID = ret.loc[i, 'stim_id']
         ret.loc[i, 'position_correct'] = mainEnc.loc[picID, 'position_correct']
@@ -237,16 +237,19 @@ def extract_taskFile(bID, sID, file_list, output):
     #import post-scan performance data from retriev into encMain
     encMain = addPostScan(encMain, retriev)
     #export encMain and retriev into tsv files (output directorty)
-    encMain.to_csv(output+'/TaskFile_bID'+bID+'_mriID'+sID+'.tsv',
+    #encMain.to_csv(output+'/TaskFile_bID'+bID+'_mriID'+sID+'.tsv',
+    #sep='\t', header=True, index=False)
+    encMain.to_csv(output+'/sub-'+mriID+'_ses-4_task-memory_events.tsv',
     sep='\t', header=True, index=False)
     retriev.to_csv(output+'/PostScanBehav_bID'+bID+'_mriID'+sID+'.tsv',
     sep='\t', header=True, index=False)
+    #sub-658178_ses-4_task-memory_events.tsv
 
 def main():
     args =  get_arguments()
     all_ids = get_all_ids(args.idir[0])
-    temp_dir = args.odir[0]+'/Temp'
-    file_dir = args.odir[0]+'/TaskFiles'
+    temp_dir = os.path.join(args.odir[0], 'Temp')
+    file_dir = os.path.join(args.odir[0], 'TaskFiles')
     if not os.path.exists(temp_dir):
         os.mkdir(temp_dir) #where unzip subject file, remove when done
     if not os.path.exists(file_dir):
