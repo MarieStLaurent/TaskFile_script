@@ -58,7 +58,7 @@ def get_all_ids(iDir):
 def set_subject_data(idBeh, datadir, output):
     print(idBeh)
     sub_files = []
-    s_dir = glob.glob(os.path.join(datadir, idBeh+'*.zip'))
+    s_dir = glob.glob(os.path.join(datadir, idBeh+'*IRM.zip'))
     if len(s_dir) != 1:
         print('Multiple directories match subject id '+idBeh)
     else:
@@ -239,7 +239,7 @@ def extract_taskFile(bID, sID, file_list, output):
     #export encMain and retriev into tsv files (output directorty)
     #encMain.to_csv(output+'/TaskFile_bID'+bID+'_mriID'+sID+'.tsv',
     #sep='\t', header=True, index=False)
-    encMain.to_csv(output+'/sub-'+mriID+'_ses-4_task-memory_events.tsv',
+    encMain.to_csv(output+'/sub-'+sID+'_ses-4_task-memory_events.tsv',
     sep='\t', header=True, index=False)
     retriev.to_csv(output+'/PostScanBehav_bID'+bID+'_mriID'+sID+'.tsv',
     sep='\t', header=True, index=False)
@@ -260,7 +260,7 @@ def main():
             extract_taskFile(idBehav, idMRI, s_files, file_dir)
         else:
             print('missing files for subject '+idBehav)
-    os.rmdir(temp_dir)
+    #os.rmdir(temp_dir) gives error, remove temp directory manually
 
 if __name__ == '__main__':
     sys.exit(main())
