@@ -136,6 +136,9 @@ def cleanRetriev(ret):
     i = ret[ret['recognition_response']==2].index
     ret.loc[i, 'position_responsetime']= NaN
     ret.loc[i, 'position_response'] = -1
+    #clean up eprime mistake (change Old67 condition ('old_new') from New to OLD)
+    q = ret[ret['stim_id']=='Old67'].index
+    ret.loc[q, 'old_new'] = 'OLD'
     #insert new columns
     colNames = ['trial_number', 'stim_category', 'stim_name',
     'recognition_performance', 'position_correct']
@@ -259,7 +262,7 @@ def main():
         if(len(s_files)==3):
             extract_taskFile(idBehav, idMRI, s_files, file_dir)
         else:
-            print('missing files for subject '+idBehav)
+            print('missing files for subject '+idBehav+', '+idMRI)
     #os.rmdir(temp_dir) gives error, remove temp directory manually
 
 if __name__ == '__main__':

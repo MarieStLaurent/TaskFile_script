@@ -63,13 +63,14 @@ var PosScanBehav_headers_CIMAQ_memory = {
       "column_index": 9,
       "data_type": "integer",
       "description":"position (quadrant) of the image on the screen during in-scan encoding;
-      ADD DESCRIPTION OF WHICH NUMBER = WHICH QUADRANT"
+      5 = bottom left, 6 = bottom right, 8 = top left, 9 = top right"
     },
     "position_response":{
       "column_index": 14,
       "data_type": "integer",
       "description":"position (quadrant) where the participant remembered the image to be
-      shown in the scanner. During the post-scan memory test, position was probed if and only if
+      shown in the scanner. 5 = bottom left, 6 = bottom right, 8 = top left, 9 = top right.
+      During the post-scan memory test, position was probed if and only if
       the participant categorized an image as 'old' (previously seen in scanner), whether it was
       previously seen (old) or not (new)"
     },
