@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python
+# encoding: utf-8
 
 import os
 import sys
@@ -228,8 +229,12 @@ def addPostScan(main, ret):
 def extract_taskFile(bID, sID, file_list, output):
     #import data from three text files into pandas DataFrames
     encMain = pd.read_csv(file_list[0], sep='\t')
-    encOnsets = pd.read_fwf(file_list[1], infer_nrows=210,
-    delim_whitespace=True, header=None)
+    manualEdits = ['3303819', '5477234', '6417837', '7674650']
+    if bID in manualEdits:
+        encOnsets = pd.read_csv(file_list[1], sep='\t', header=None)
+    else:     
+        encOnsets = pd.read_fwf(file_list[1], infer_nrows=210,
+        delim_whitespace=True, header=None)
     retriev = pd.read_csv(file_list[2], sep='\t', encoding = 'ISO-8859-1')
     #clean up each file
     encMain = cleanMain(encMain)
