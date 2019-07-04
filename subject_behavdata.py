@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import os
-import sys
-import argparse
 import glob
+import os
 import re
-import zipfile
+import sys
+
+
+import argparse
+import logging as log
+from numpy import nan as NaN
 import numpy as np
 import pandas as pd
-from numpy import nan as NaN
+import zipfile
 
 def get_arguments():
     parser = argparse.ArgumentParser(
@@ -17,26 +20,23 @@ def get_arguments():
         description="",
         epilog="""
         Convert behavioural data from cimaq to bids format
-        Input: Folder
+        Input: Folder with zip files
         """)
 
     parser.add_argument(
         "-d", "--idir",
         required=True, nargs="+",
-        help="Folder to be sorted",
-        )
+        help="Folder to be sorted")
 
     parser.add_argument(
         "-o", "--odir",
         required=True, nargs="+",
-        help="Output    folder - if doesnt exist it will be created",
-        )
+        help="Output folder - if doesnt exist it will be created.")
 
     parser.add_argument(
-        "-v", "--verbose",
-        required=False, nargs="+",
-        help="Verbose to    get more information about what's going on",
-        )
+        '--log_level', default='INFO',
+                       choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                       help='Log level of the logging class.')
 
     args =  parser.parse_args()
     if  len(sys.argv) == 1:
@@ -46,6 +46,15 @@ def get_arguments():
         return args
 
 def get_all_ids(iDir):
+    """ List all ZipFile and get all IDs
+    Parameters:
+    ----------
+    iDir: string input (input folder)
+
+    Return:
+    ----------
+    ids: list of tuple (behavioral ID, IRM ID)
+    """
     if not os.path.exists(iDir):
         sys.exit('This folder doesnt exist: {}'.format(iDir))
         return
@@ -57,6 +66,17 @@ def get_all_ids(iDir):
     return ids
 
 def set_subject_data(idBeh, datadir, output):
+    """
+    Parameters:
+    ----------
+    idBeh: string (behavioral ID)
+    datadir: string (input folder)
+    output: string (output folder)
+
+    Return:
+    ----------
+    sub_files: list (three input files)
+    """
     print(idBeh)
     sub_files = []
     s_dir = glob.glob(os.path.join(datadir, idBeh+'*IRM.zip'))
@@ -80,6 +100,15 @@ def set_subject_data(idBeh, datadir, output):
     return sub_files
 
 def cleanMain(mainFile):
+    """
+    Parameters:
+    ----------
+    mainFile: pandas object
+
+    Return:
+    ----------
+    mainFile: pandas object
+    """
     #remove first three junk rows (blank trials): CTL0, Enc00 and ENc000
     mainFile.drop([0, 1, 2], axis=0, inplace=True)
     #re-label columns
@@ -106,14 +135,31 @@ def cleanMain(mainFile):
     return mainFile #modified in-place
 
 def cleanOnsets(onsets):
+    """ Remove first six junk rows (3 junk trials; 2 rows per trial)
+    Parameters:
+    ----------
+    onsets: pandas object
+
+    Return:
+    ----------
+    onsets: pandas object
+    """
     #add column headers
     onsets.columns = ["TrialNum", "Condition", "TrialNum_perCondi",
     "ImageID", "Trial_part", "onsetSec", "durationSec"]
-    #remove first six junk rows (3 junk trials; 2 rows per trial)
     onsets.drop([0, 1, 2, 3, 4, 5], axis=0, inplace=True)
     return onsets
 
 def cleanRetriev(ret):
+    """
+    Parameters:
+    ----------
+    ret: pandas object
+
+    Return:
+    ----------
+    ret: pandas object
+    """
     #Change column headers
     ret.rename(columns={'category':'old_new', 'Stim':'stim_file',
     'OldNumber':'stim_id', 'Recognition_ACC':'recognition_accuracy',
@@ -168,6 +214,17 @@ def cleanRetriev(ret):
     return ret
 
 def addOnsets(main, enc):
+    """
+    Parameters:
+    ----------
+    main:
+    enc: pandas objects
+
+    Return:
+    ----------
+    main: pandas object
+    """
+
     #make main file indexable by trial number:
     main.set_index('trial_number', inplace = True)
     #copy trial onset and offset times from enc into main
@@ -185,6 +242,16 @@ def addOnsets(main, enc):
     return main
 
 def addPostScan(main, ret):
+    """
+    Parameters:
+    ----------
+    main: panda object
+    ret: panda object
+
+    Return:
+    ----------
+    mainMerged: pandas object
+    """
     #split main's rows (trials) into sublist based on Condition
     mainEnc = main[main['trial_type']=='Enc'].copy()
     mainCTL = main[main['trial_type']=='CTL'].copy()
@@ -227,12 +294,24 @@ def addPostScan(main, ret):
     return mainMerged
 
 def extract_taskFile(bID, sID, file_list, output):
+    """
+    Parameters:
+    ----------
+    bID: string (behavioral ID)
+    sID: string (structural ID)
+    file_list: list (three input files)
+    output: string (output Folder)
+
+    Return:
+    ----------
+    None
+    """
     #import data from three text files into pandas DataFrames
     encMain = pd.read_csv(file_list[0], sep='\t')
     manualEdits = ['3303819', '5477234', '6417837', '7674650']
     if bID in manualEdits:
         encOnsets = pd.read_csv(file_list[1], sep='\t', header=None)
-    else:     
+    else:
         encOnsets = pd.read_fwf(file_list[1], infer_nrows=210,
         delim_whitespace=True, header=None)
     retriev = pd.read_csv(file_list[2], sep='\t', encoding = 'ISO-8859-1')
