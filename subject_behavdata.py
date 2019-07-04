@@ -1,15 +1,16 @@
-# !/usr/bin/env python
-#  encoding: utf-8
+#!/usr/bin/env python
+# encoding: utf-8
 
-import glob
 import os
 import re
 import sys
 
 import argparse
-import logging as log
+import glob
+import logging
 from numpy import nan as NaN
 import pandas as pd
+import shutil
 import zipfile
 
 
@@ -45,60 +46,76 @@ def get_arguments():
         return args
 
 
-def get_all_ids(iDir):
+def get_all_ids(iFolder):
     """ List all ZipFile and get all IDs
     Parameters:
     ----------
-    iDir: string input (input folder)
+    iFolder: string (input folder)
 
     Return:
     ----------
     ids: list of tuple (behavioral ID, IRM ID)
     """
-    if not os.path.exists(iDir):
-        sys.exit('This folder doesnt exist: {}'.format(iDir))
+    if not os.path.exists(iFolder):
+        sys.exit('This folder doesnt exist: {}'.format(iFolder))
         return
     ids = []
-    allZipFiles = glob.glob(os.path.join(iDir, '*.zip'))
+    allZipFiles = glob.glob(os.path.join(iFolder, '*.zip'))
     for currZipFile in allZipFiles:
         currZipFile = os.path.basename(currZipFile)
         ids.append((currZipFile.split('_')[0], currZipFile.split('_')[1]))
-    return ids
+
+    if not ids:
+        sys.exit('This folder doesnt contain any zip files')
+        return
+    else:
+        return ids
 
 
-def set_subject_data(idBeh, datadir, output):
+def set_subject_data(bID, iFolder, oFolder):
     """
     Parameters:
     ----------
-    idBeh: string (behavioral ID)
+    bID: string (behavioral ID)
     datadir: string (input folder)
-    output: string (output folder)
+    oFolder: string (output folder)
 
     Return:
     ----------
     sub_files: list (three input files)
     """
-    print(idBeh)
+    logging.debug(' Subject behavioral ID: {}'.format(bID))
+
+    prefix = ['Output-Responses-Encoding_CIMAQ_*',
+              'Onset-Event-Encoding_CIMAQ_*',
+              'Output_Retrieval_CIMAQ_*']
+
     sub_files = []
-    s_dir = glob.glob(os.path.join(datadir, idBeh+'*IRM.zip'))
+    s_dir = glob.glob(os.path.join(iFolder, bID+'*IRM.zip'))
+
     if len(s_dir) != 1:
-        print('Multiple directories match subject id '+idBeh)
+        logging.error(' Multiple directories match \
+                       this subject behavioral ID: {}'.format(bID))
     else:
-        s_path = os.path.join(output, idBeh+'*')
+        s_path = os.path.join(oFolder, bID+'*')
         s_out = glob.glob(s_path)
-        if len(s_out) < 1:
+        if not s_out:
             z_ref = zipfile.ZipFile(s_dir[0], 'r')
-            z_ref.extractall(output)
+            z_ref.extractall(oFolder)
             z_ref.close()
             s_out = glob.glob(s_path)
-        prefix = ['Output-Responses-Encoding_CIMAQ_*',
-                  'Onset-Event-Encoding_CIMAQ_*',
-                  'Output_Retrieval_CIMAQ_*']
+
         if len(s_out) == 1:
-            for i in range(0, 3):
-                file = glob.glob(os.path.join(s_out[0], prefix[i]))
+            s_out = s_out[0]
+            for nPrefix in prefix:
+                file = glob.glob(os.path.join(s_out, nPrefix))
                 if len(file) == 1:
                     sub_files.append(file[0])
+                else:
+                    logging.error('Multiple files found'.format(bID))
+        else:
+            logging.error('Multiple folders found'.format(bID))
+
     return sub_files
 
 
@@ -362,20 +379,36 @@ def extract_taskFile(bID, sID, file_list, output):
 
 def main():
     args = get_arguments()
-    all_ids = get_all_ids(args.idir[0])
-    temp_dir = os.path.join(args.odir[0], 'Temp')
-    file_dir = os.path.join(args.odir[0], 'TaskFiles')
-    if not os.path.exists(temp_dir):
-        os.mkdir(temp_dir)  # where unzip subject file, remove when done
-    if not os.path.exists(file_dir):
-        os.mkdir(file_dir)  # where task files are saved
-    for (idBehav, idMRI) in all_ids:
-        s_files = set_subject_data(idBehav, args.idir[0], temp_dir)
+    logging.basicConfig(level=args.log_level)
+    oFolder = args.odir[0]
+    iFolder = args.idir[0]
+
+    # Create oFolder if not exists
+    if not os.path.exists(oFolder):
+        os.mkdir(oFolder)
+
+    all_ids = get_all_ids(iFolder)
+    # Create tmp folder to temporaly store unziped files
+    tmpFolder = os.path.join(oFolder, 'tmp')
+    if not os.path.exists(tmpFolder):
+        os.mkdir(tmpFolder)
+
+    # Create taskFiles folder where all output files will be saved
+    fileFolder = os.path.join(oFolder, 'taskfiles')
+    if not os.path.exists(fileFolder):
+        os.mkdir(fileFolder)
+
+    # loop over zip files
+    for (idBEH, idMRI) in all_ids:
+        s_files = set_subject_data(idBEH, iFolder, tmpFolder)
         if(len(s_files) == 3):
-            extract_taskFile(idBehav, idMRI, s_files, file_dir)
+            extract_taskFile(idBEH, idMRI, s_files, fileFolder)
+            shutil.rmtree(tmpFolder, ignore_errors=True)
         else:
-            print('missing files for subject '+idBehav+', '+idMRI)
-    # os.rmdir(temp_dir) gives error, remove temp directory manually
+            logging.info('missing files for subject ({},{})'.format(idBEH,
+                                                                    idMRI))
+
+            #
 
 
 if __name__ == '__main__':
