@@ -31,7 +31,7 @@ def get_arguments():
     parser.add_argument(
         "-o", "--odir",
         required=True, nargs="+",
-        help="Output folder - if doesnt exist it will be created.")
+        help="Output folder - if doesn\'t exist it will be created.")
 
     parser.add_argument(
         '--log_level', default='INFO',
@@ -57,7 +57,7 @@ def get_all_ids(iFolder):
     ids: list of tuple (behavioral ID, IRM ID)
     """
     if not os.path.exists(iFolder):
-        sys.exit('This folder doesnt exist: {}'.format(iFolder))
+        sys.exit('This folder doesn\'t exist: {}'.format(iFolder))
         return
     ids = []
     allZipFiles = glob.glob(os.path.join(iFolder, '*.zip'))
@@ -66,7 +66,7 @@ def get_all_ids(iFolder):
         ids.append((currZipFile.split('_')[0], currZipFile.split('_')[1]))
 
     if not ids:
-        sys.exit('This folder doesnt contain any zip files')
+        sys.exit('This folder doesn\'t contain any zip files')
         return
     else:
         return ids
@@ -76,7 +76,7 @@ def set_subject_data(bID, iFolder, oFolder):
     """
     Parameters:
     ----------
-    bID: string (behavioral ID)
+    bID: string (PSCID used to identify participants during data collection)
     datadir: string (input folder)
     oFolder: string (output folder)
 
@@ -84,7 +84,7 @@ def set_subject_data(bID, iFolder, oFolder):
     ----------
     sub_files: list (three input files)
     """
-    logging.debug(' Subject behavioral ID: {}'.format(bID))
+    logging.debug('Subject PSCID": {}'.format(bID))
 
     prefix = ['Output-Responses-Encoding_CIMAQ_*',
               'Onset-Event-Encoding_CIMAQ_*',
@@ -95,7 +95,7 @@ def set_subject_data(bID, iFolder, oFolder):
 
     if len(s_dir) != 1:
         logging.error(' Multiple directories match \
-                       this subject behavioral ID: {}'.format(bID))
+                       this subject behavioral PSCID: {}'.format(bID))
     else:
         s_path = os.path.join(oFolder, bID+'*')
         s_out = glob.glob(s_path)
@@ -164,7 +164,10 @@ def cleanMain(mainFile):
 
 
 def cleanOnsets(onsets):
-    """ Remove first six junk rows (3 junk trials; 2 rows per trial)
+    """
+    Description:
+        Remove first six junk rows (3 junk trials; 2 rows per trial)
+
     Parameters:
     ----------
     onsets: pandas object
@@ -211,10 +214,10 @@ def cleanRetriev(ret):
     ret[['position_responsetime']] = ret[['position_responsetime']].astype('float64', copy=False)
     ret['recognition_responsetime'] = ret['recognition_responsetime'].div(1000)
     ret['position_responsetime'] = ret['position_responsetime'].div(1000)
-    # Clean up eprime mistake: replace position_response and position_responsetime
-    # to NaN if subject perceived image as new (not probed for position)
-    # There should not be a response or an RT value there, it is carried over from previous trial (not reset)
-    # VERIFY: cannot flag trials were person answered OLD but failed to give position answer when probed
+    # Clean up eprime programming mistake: replace position_response and position_responsetime values
+    # with NaN if subject perceived image as 'new' (the image was not probed for position).
+    # There should be no response or RT value there, values were carried over from previous trial (not reset in eprime)
+    # CONFIRMED w Isabel: subject must give a position answer when probed (image considered OLD) before eprime moves to the next trial.
     i = ret[ret['recognition_response'] == 2].index
     ret.loc[i, 'position_responsetime'] = NaN
     ret.loc[i, 'position_response'] = -1
@@ -227,7 +230,6 @@ def cleanRetriev(ret):
     dtype = [-1, 'None', 'None', 'None', -1]
     colIndex = [0, 4, 5, 9, 10]
     for j in range(0, 5):
-        # FIX efficienty: add new columns; change order?
         ret.insert(loc=colIndex[j], column=colNames[j], value=dtype[j],
                    allow_duplicates=True)
     # Extract info and fill trial_number, stim_category and stim_name columns
@@ -340,8 +342,8 @@ def extract_taskFile(bID, sID, file_list, output):
     """
     Parameters:
     ----------
-    bID: string (behavioral ID)
-    sID: string (structural ID)
+    bID: string (subject PSCID, id used during data collection)
+    sID: string (subject DCCID, id used in Loris)
     file_list: list (three input files)
     output: string (output Folder)
 
@@ -368,13 +370,10 @@ def extract_taskFile(bID, sID, file_list, output):
     # import post-scan performance data from retriev into encMain
     encMain = addPostScan(encMain, retriev)
     # export encMain and retriev into tsv files (output directorty)
-    # encMain.to_csv(output+'/TaskFile_bID'+bID+'_mriID'+sID+'.tsv',
-    # sep='\t', header=True, index=False)
     encMain.to_csv(output+'/sub-'+sID+'_ses-4_task-memory_events.tsv',
                    sep='\t', header=True, index=False)
-    retriev.to_csv(output+'/PostScanBehav_bID'+bID+'_mriID'+sID+'.tsv',
+    retriev.to_csv(output+'/PostScanBehav_pscid'+bID+'_dccid'+sID+'.tsv',
                    sep='\t', header=True, index=False)
-    # sub-658178_ses-4_task-memory_events.tsv
 
 
 def main():
