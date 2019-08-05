@@ -95,7 +95,7 @@ def set_subject_data(bID, iFolder, oFolder):
 
     if len(s_dir) != 1:
         logging.error(' Multiple directories match \
-                       this subject behavioral PSCID: {}'.format(bID))
+                       this subject PSCID: {}'.format(bID))
     else:
         s_path = os.path.join(oFolder, bID+'*')
         s_out = glob.glob(s_path)
@@ -166,7 +166,8 @@ def cleanMain(mainFile):
 def cleanOnsets(onsets):
     """
     Description:
-        Remove first six junk rows (3 junk trials; 2 rows per trial)
+        Label columns and remove first six junk rows
+        (3 junk trials; 2 rows per trial).
 
     Parameters:
     ----------
